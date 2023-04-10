@@ -1,0 +1,77 @@
+stages:
+- name: Integration--initial pipeline
+  iiidevops: initial-pipeline
+  steps:
+  - envFrom:
+    - sourceKey: api-origin
+      sourceName: nexus
+      targetKey: api_origin
+    runScriptConfig:
+      image: iiiorg/iiidevops-cli:0.0.1
+      shellScript: curl --location -s --request POST ${api_origin}/rancher/delete_app
+        --form project_name=${CICD_GIT_REPO_NAME} --form branch_name=${CICD_GIT_BRANCH}
+        && count-src.pl
+- name: Deploy--Set Web environment variables
+  iiidevops: deployed-environments
+  steps:
+  - envFrom:
+    - sourceKey: API_TOKEN
+      sourceName: pipeline-api-key
+      targetKey: rancher_api_token
+    - sourceKey: rancher-url
+      sourceName: rancher
+      targetKey: rancher_url
+    runScriptConfig:
+      image: iiiorg/iiidevops-cli:0.0.1
+      shellScript: rancher login ${rancher_url} -t ${rancher_api_token} --skip-verify
+        && rancher kubectl delete configmap -n ${CICD_GIT_REPO_NAME} ${CICD_GIT_REPO_NAME}-${CICD_GIT_BRANCH}-env
+        --ignore-not-found=true && perl iiidevops/bin/chk-app-env.pl && rancher kubectl
+        create configmap -n ${CICD_GIT_REPO_NAME} ${CICD_GIT_REPO_NAME}-${CICD_GIT_BRANCH}-env
+        --from-env-file=iiidevops/app.env && rancher kubectl annotate configmap -n
+        ${CICD_GIT_REPO_NAME} ${CICD_GIT_REPO_NAME}-${CICD_GIT_BRANCH}-env iiidevops.org/project_name=${CICD_GIT_REPO_NAME}
+        iiidevops.org/branch=${CICD_GIT_BRANCH} iiidevops.org/commit_id=${CICD_GIT_COMMIT}
+        iiidevops.org/type=appenv
+  when:
+    branch:
+      include:
+      - master
+- name: Deploy--InfluxDB
+  iiidevops: deployed-environments
+  steps:
+  - applyYamlConfig:
+      path: ./k8s/influxdb-deployment.yaml
+  when:
+    branch:
+      include:
+      - master
+- name: Deploy--InfluxDB-service
+  iiidevops: deployed-environments
+  steps:
+  - applyYamlConfig:
+      path: ./k8s/influxdb-service.yaml
+  when:
+    branch:
+      include:
+      - master
+- name: Deploy--Wait InfluxDB deployment
+  iiidevops: deployed-environments
+  steps:
+  - env:
+      deploy_name: ${CICD_GIT_REPO_NAME}-${CICD_GIT_BRANCH}-influx
+      max_wait: 128
+      namespace: ${CICD_GIT_REPO_NAME}
+    envFrom:
+    - sourceKey: API_TOKEN
+      sourceName: pipeline-api-key
+      targetKey: rancher_api_token
+    - sourceKey: rancher-url
+      sourceName: rancher
+      targetKey: rancher_url
+    runScriptConfig:
+      image: iiiorg/iiidevops-cli:0.0.1
+      shellScript: rancher login ${rancher_url} -t ${rancher_api_token} --skip-verify;
+        deploy-wait.pl
+  when:
+    branch:
+      include:
+      - master
