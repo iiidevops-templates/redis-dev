@@ -7,7 +7,7 @@ stages:
       sourceName: nexus
       targetKey: api_origin
     runScriptConfig:
-      image: iiiorg/iiidevops-cli:0.0.1
+      image: iiiorg/iiidevops-cli:0.0.4
       shellScript: curl --location -s --request POST ${api_origin}/rancher/delete_app
         --form project_name=${CICD_GIT_REPO_NAME} --form branch_name=${CICD_GIT_BRANCH}
         && count-src.pl
@@ -22,10 +22,10 @@ stages:
       sourceName: rancher
       targetKey: rancher_url
     runScriptConfig:
-      image: iiiorg/iiidevops-cli:0.0.1
+      image: iiiorg/iiidevops-cli:0.0.4
       shellScript: rancher login ${rancher_url} -t ${rancher_api_token} --skip-verify
         && rancher kubectl delete configmap -n ${CICD_GIT_REPO_NAME} ${CICD_GIT_REPO_NAME}-${CICD_GIT_BRANCH}-env
-        --ignore-not-found=true && perl iiidevops/bin/chk-app-env.pl && rancher kubectl
+        --ignore-not-found=true && chk-app-env.pl && rancher kubectl
         create configmap -n ${CICD_GIT_REPO_NAME} ${CICD_GIT_REPO_NAME}-${CICD_GIT_BRANCH}-env
         --from-env-file=iiidevops/app.env && rancher kubectl annotate configmap -n
         ${CICD_GIT_REPO_NAME} ${CICD_GIT_REPO_NAME}-${CICD_GIT_BRANCH}-env iiidevops.org/project_name=${CICD_GIT_REPO_NAME}
@@ -35,29 +35,38 @@ stages:
     branch:
       include:
       - master
-- name: Deploy--InfluxDB
+- name: Deploy--Redis-config
   iiidevops: deployed-environments
   steps:
   - applyYamlConfig:
-      path: ./k8s/influxdb-deployment.yaml
+      path: ./k8s/redis-config.yaml
   when:
     branch:
       include:
       - master
-- name: Deploy--InfluxDB-service
+- name: Deploy--Redis
   iiidevops: deployed-environments
   steps:
   - applyYamlConfig:
-      path: ./k8s/influxdb-service.yaml
+      path: ./k8s/redis-deployment.yaml
   when:
     branch:
       include:
       - master
-- name: Deploy--Wait InfluxDB deployment
+- name: Deploy--Redis-service
+  iiidevops: deployed-environments
+  steps:
+  - applyYamlConfig:
+      path: ./k8s/redis-service.yaml
+  when:
+    branch:
+      include:
+      - master
+- name: Deploy--Wait Redis deployment
   iiidevops: deployed-environments
   steps:
   - env:
-      deploy_name: ${CICD_GIT_REPO_NAME}-${CICD_GIT_BRANCH}-influx
+      deploy_name: ${CICD_GIT_REPO_NAME}-${CICD_GIT_BRANCH}-redis
       max_wait: 128
       namespace: ${CICD_GIT_REPO_NAME}
     envFrom:
@@ -68,7 +77,7 @@ stages:
       sourceName: rancher
       targetKey: rancher_url
     runScriptConfig:
-      image: iiiorg/iiidevops-cli:0.0.1
+      image: iiiorg/iiidevops-cli:0.0.4
       shellScript: rancher login ${rancher_url} -t ${rancher_api_token} --skip-verify;
         deploy-wait.pl
   when:

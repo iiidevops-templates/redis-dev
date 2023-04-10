@@ -1,0 +1,36 @@
+apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Deployment
+metadata:
+  name: ${CICD_GIT_REPO_NAME}-${CICD_GIT_BRANCH}-redis
+  namespace: ${CICD_GIT_REPO_NAME}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ${CICD_GIT_REPO_NAME}-${CICD_GIT_BRANCH}-redis
+  template:
+    metadata:
+      labels:
+        app: ${CICD_GIT_REPO_NAME}-${CICD_GIT_BRANCH}-redis
+      annotations:
+        iiidevops.org/project_name: "${CICD_GIT_REPO_NAME}"
+        iiidevops.org/branch: "${CICD_GIT_BRANCH}"
+        iiidevops.org/commit_id: "${CICD_GIT_COMMIT}"
+        iiidevops.org/type: db-server
+    spec:
+      imagePullSecrets:
+      - name: harbor-local
+      containers:
+      - image: redis:6.2.6
+        name: ${CICD_GIT_REPO_NAME}-${CICD_GIT_BRANCH}-redis
+        ports:
+        - containerPort: 6379
+        command: ["redis-server", "/conf/redis.conf"]
+        volumeMounts:
+        - name: conf
+          mountPath: /conf
+      volumes:
+      - name: conf
+        configMap:
+          name: ${CICD_GIT_REPO_NAME}-${CICD_GIT_BRANCH}-redis-config
+          defaultMode: 0755
