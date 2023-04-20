@@ -11,30 +11,6 @@ stages:
       shellScript: curl --location -s --request POST ${api_origin}/rancher/delete_app
         --form project_name=${CICD_GIT_REPO_NAME} --form branch_name=${CICD_GIT_BRANCH}
         && count-src.pl
-- name: Deploy--Set Web environment variables
-  iiidevops: deployed-environments
-  steps:
-  - envFrom:
-    - sourceKey: API_TOKEN
-      sourceName: pipeline-api-key
-      targetKey: rancher_api_token
-    - sourceKey: rancher-url
-      sourceName: rancher
-      targetKey: rancher_url
-    runScriptConfig:
-      image: iiiorg/iiidevops-cli:0.0.4
-      shellScript: rancher login ${rancher_url} -t ${rancher_api_token} --skip-verify
-        && rancher kubectl delete configmap -n ${CICD_GIT_REPO_NAME} ${CICD_GIT_REPO_NAME}-${CICD_GIT_BRANCH}-env
-        --ignore-not-found=true && chk-app-env.pl && rancher kubectl
-        create configmap -n ${CICD_GIT_REPO_NAME} ${CICD_GIT_REPO_NAME}-${CICD_GIT_BRANCH}-env
-        --from-env-file=iiidevops/app.env && rancher kubectl annotate configmap -n
-        ${CICD_GIT_REPO_NAME} ${CICD_GIT_REPO_NAME}-${CICD_GIT_BRANCH}-env iiidevops.org/project_name=${CICD_GIT_REPO_NAME}
-        iiidevops.org/branch=${CICD_GIT_BRANCH} iiidevops.org/commit_id=${CICD_GIT_COMMIT}
-        iiidevops.org/type=appenv
-  when:
-    branch:
-      include:
-      - master
 - name: Deploy--Redis-config
   iiidevops: deployed-environments
   steps:
